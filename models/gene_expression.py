@@ -1,9 +1,8 @@
 import numpy as np
 from typing import Any, Dict
 import anndata
-from pathlib import Path
-from helical.models.scgpt.model import scGPT, scGPTConfig
-from helical.models.geneformer.model import Geneformer, GeneformerConfig
+from helical.models.scgpt.model import scGPT 
+from helical.models.geneformer.model import Geneformer
 
 
 # example class but this could be done https://github.com/pydantic/pydantic-ai/blob/main/pydantic_ai_slim/pydantic_ai/models/openai.py
