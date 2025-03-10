@@ -4,10 +4,15 @@ from typing import List, Dict, Any
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
+import logfire
 
 from config import settings
 from models.gene_expression import get_embedding_model
 from models.clustering import cluster_patients
+from monitoring.telemetry import setup_monitoring
+
+# Initialize monitoring at startup
+setup_monitoring()
 
 #Headsup: BaseModel would be overkill since this class just holds configuration values. 
 #The other classes use BaseModel because they need Pydantic's validation and serialization features for API responses
@@ -68,12 +73,15 @@ async def generate_embeddings(ctx: RunContext[StratificationDependencies]) -> Di
     input_file = ctx.deps.input_file
     model_name = ctx.deps.embedding_model
     
-    print(f"Generating embeddings using {model_name} model from {input_file}")
+    logfire.info('Starting embedding generation with {model}', model=model_name)
     
     # TODO: In a real implementation, this would call actual embedding models OR (suggested) use the actual embedding model
     # added to the available models of pydantic-ai through custom code. As in here: https://github.com/pydantic/pydantic-ai/blob/main/pydantic_ai_slim/pydantic_ai/models/openai.py
     embedding_model = get_embedding_model(model_name)
     embeddings = embedding_model.process(input_file)
+    
+    logfire.info('Completed embedding generation: {shape} embeddings created', 
+                 shape=embeddings.shape)
     
     return {
         "num_patients": embeddings.shape[0],
@@ -86,16 +94,18 @@ async def generate_embeddings(ctx: RunContext[StratificationDependencies]) -> Di
 async def identify_patient_clusters(
     ctx: RunContext[StratificationDependencies], 
 ) -> Dict[str, Any]:
-    """
-    Identify distinct patient clusters based on gene expression embeddings.
-    """
+    """Identify distinct patient clusters based on gene expression embeddings."""
     input_file = ctx.deps.input_file
     clustering_method = ctx.deps.clustering_method
     
-    print(f"Clustering patients using {clustering_method}")
+    logfire.info('Starting patient clustering using {method}', method=clustering_method)
     
     #TODO: This would call the actual clustering implementation
     clusters = cluster_patients(input_file, clustering_method)
+    
+    logfire.info('Completed clustering: identified {num} clusters with silhouette score {score}', 
+                 num=clusters["num_clusters"],
+                 score=clusters["silhouette_score"])
     
     return {
         "num_clusters": clusters["num_clusters"],
@@ -106,6 +116,8 @@ async def identify_patient_clusters(
 
 async def main():
     """Run the stratification agent on a sample dataset."""
+    logfire.info('Starting patient stratification pipeline')
+    
     deps = StratificationDependencies(
         input_file="sample_breast_cancer_data.h5ad",
     )
@@ -115,6 +127,7 @@ async def main():
         deps=deps
     )
     
+    logfire.info('Completed stratification pipeline')
     print(result.data)
 
 

@@ -3,6 +3,7 @@ from typing import Any, Dict
 import anndata
 from helical.models.scgpt.model import scGPT 
 from helical.models.geneformer.model import Geneformer
+from monitoring.telemetry import monitor_model_execution
 
 
 # example class but this could be done https://github.com/pydantic/pydantic-ai/blob/main/pydantic_ai_slim/pydantic_ai/models/openai.py
@@ -24,12 +25,18 @@ class HelicalScGPTModel(EmbeddingModel):
         super().__init__("scgpt")
         self.model = scGPT()
     
+    @monitor_model_execution
     def process(self, input_file: str) -> np.ndarray:
         """Process gene expression data using Helical's scGPT model."""
         print(f"Processing {input_file} with Helical scGPT model")
         
         adata = anndata.read_h5ad(input_file)
-        self.model.config["emb_mode"] = "cls"  # Use CLS token embedding mode
+        
+        # Ensure data is in the format scGPT expects
+        if 'gene_ids' not in adata.var or 'gene' not in adata.var:
+            raise ValueError("Dataset must contain 'gene_ids' and 'gene' columns in .var")
+            
+        self.model.config["emb_mode"] = "cls"
         embeddings = self.model.get_embeddings(adata)
         
         return embeddings
