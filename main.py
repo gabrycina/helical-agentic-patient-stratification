@@ -10,6 +10,7 @@ from config import settings
 from models.gene_expression import get_embedding_model
 from models.clustering import cluster_patients
 from monitoring.telemetry import setup_monitoring
+from models.state import state  # Add this import
 
 # Initialize monitoring at startup
 setup_monitoring()
@@ -83,9 +84,8 @@ async def generate_embeddings(ctx: RunContext[StratificationDependencies]) -> Di
     logfire.info('Completed embedding generation: {shape} embeddings created', 
                  shape=embeddings.shape)
     
-    
-    # TODO: Store embeddings in memory
-    ctx.memory['embeddings'] = embeddings
+    # Store embeddings in state
+    state.set('embeddings', embeddings)
     
     return {
         "num_patients": embeddings.shape[0],
@@ -101,11 +101,11 @@ async def identify_patient_clusters(
     """Identify distinct patient clusters based on gene expression embeddings."""
     clustering_method = ctx.deps.clustering_method
     
-    # Get embeddings from memory
-    if 'embeddings' not in ctx.memory:
+    # Get embeddings from state
+    if not state.has('embeddings'):
         raise ValueError("No embeddings found. Run generate_embeddings first.")
     
-    embeddings = ctx.memory['embeddings']
+    embeddings = state.get('embeddings')
     
     logfire.info('Starting patient clustering using {method}', method=clustering_method)
     
