@@ -28,7 +28,7 @@ class PatientSubgroup(BaseModel):
     """Model representing a patient subgroup."""
     group_id: int = Field(..., description="Unique identifier for the subgroup")
     size: int = Field(..., description="Number of patients in this subgroup")
-    marker_genes: List[str] = Field(..., description="Specific genes that are uniquely active (or inactive) in a group of patients, acting like a fingerprint to identify that group") # Characteristics traits we may say
+    marker_genes: List[str] = Field(..., description="Specific genes that are uniquely active (or inactive) in a group of patients, acting like a fingerprint to identify that group") # Characteristics traits we may say
     pathways: List[str] = Field(..., description="Enriched biological pathways")
     drugs: List[str] = Field([], description="Potential drugs targeting this subgroup")
 
@@ -69,7 +69,7 @@ async def data_context(ctx: RunContext[StratificationDependencies]) -> str:
 
 @stratification_agent.tool
 async def generate_embeddings(ctx: RunContext[StratificationDependencies]) -> Dict[str, Any]:
-    """Generate embeddings from gene expression data to create a latent representation of patient profiles."""
+    """Generate embeddings from gene expression data."""
     input_file = ctx.deps.input_file
     model_name = ctx.deps.embedding_model
     
@@ -83,6 +83,10 @@ async def generate_embeddings(ctx: RunContext[StratificationDependencies]) -> Di
     logfire.info('Completed embedding generation: {shape} embeddings created', 
                  shape=embeddings.shape)
     
+    
+    # TODO: Store embeddings in memory
+    ctx.memory['embeddings'] = embeddings
+    
     return {
         "num_patients": embeddings.shape[0],
         "embedding_dimensions": embeddings.shape[1],
@@ -95,23 +99,24 @@ async def identify_patient_clusters(
     ctx: RunContext[StratificationDependencies], 
 ) -> Dict[str, Any]:
     """Identify distinct patient clusters based on gene expression embeddings."""
-    input_file = ctx.deps.input_file
     clustering_method = ctx.deps.clustering_method
+    
+    # Get embeddings from memory
+    if 'embeddings' not in ctx.memory:
+        raise ValueError("No embeddings found. Run generate_embeddings first.")
+    
+    embeddings = ctx.memory['embeddings']
     
     logfire.info('Starting patient clustering using {method}', method=clustering_method)
     
     #TODO: This would call the actual clustering implementation
-    clusters = cluster_patients(input_file, clustering_method)
+    clusters = cluster_patients(embeddings, clustering_method)
     
     logfire.info('Completed clustering: identified {num} clusters with silhouette score {score}', 
                  num=clusters["num_clusters"],
                  score=clusters["silhouette_score"])
     
-    return {
-        "num_clusters": clusters["num_clusters"],
-        "cluster_sizes": clusters["sizes"],
-        "silhouette_score": clusters["silhouette_score"]
-    }
+    return clusters
 
 
 async def main():
