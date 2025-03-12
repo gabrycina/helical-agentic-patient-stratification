@@ -1,5 +1,4 @@
 from typing import Dict, Any
-import numpy as np
 
 class StateManager:
     """Simple state manager to share data between agent tools."""
